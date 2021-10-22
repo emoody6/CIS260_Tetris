@@ -1,8 +1,11 @@
+
+//GLOBAL VARIABLES//
+
 var startTime;	//Time when the program starts
 var lastTime;	//Time of previous frame
 var curTime;	//Time of current frame
 
-var frame;
+var frame; //Number of the frame we are on right now
 var pace = 200; //Automatic piece movement time (ms); Speeds up as the game continues
 var nextStep = 0; //Keeps track of when the next step should occue
 
@@ -10,14 +13,24 @@ var activePiece = null; //Holds a list of the tile locations of the active piece
 var queueA = [] //List of pieces to use next
 var queueB = [] //Replaces A once A is empty, then is replaced by a new list
 
-var rowsToClear = [];
-var clearingRow = 0;
+var rowsToClear = []; //Holds a list of the rows that are completed and need to be cleared
+var clearingRow = 0; //Variable that controls row clearing. See the section on row clearing for more detailed analysis
 
-const BOARD_HEIGHT = 20;
-const BOARD_WIDTH = 10;
+//Positional constants
+const LEFT = -1;
+const RIGHT = 1;
 
-const EMPTY = 0;
-const COLOR = {
+const X = 0
+const Y = 1
+
+const BOARD_HEIGHT = 20; //Height of the game board (Y)
+const BOARD_WIDTH = 10; //Width of the game board (X)
+
+const EMPTY = 0; //Empty board tiles are marked with 0, filled tiles are marked with their respective color
+
+//TODO: Combine all of these into one object?
+
+const COLOR = { //Each piece's assigned color index
 	Z: 1,
 	L: 2,
 	O: 3,
@@ -27,6 +40,7 @@ const COLOR = {
 	T: 7,
 }
 
+//Color Indexes
 const RED = 1;
 const ORANGE = 2;
 const YELLOW = 3;
@@ -35,6 +49,7 @@ const CYAN = 5;
 const BLUE = 6;
 const PURPLE = 7;
 
+//Index to color codes
 const COLOR_CODE = {
 	1: 	'#e03030',
 	2: 	'#e08030',
@@ -46,12 +61,7 @@ const COLOR_CODE = {
 	
 }
 
-const LEFT = -1;
-const RIGHT = 1;
-
-const X = 0
-const Y = 1
-
+//Spawn positions of the pieces
 const PIECES = {
 	
 	L:[[0, 1], [1, 1], [2, 0], [2, 1]],
@@ -96,7 +106,31 @@ for( let n = 0; n < BOARD_WIDTH; n++){
 	boardPos.push( Array(BOARD_HEIGHT).fill(0) )
 }
 
-console.log(boardPos)
+//--------------------------------------------------------------------------//
+//		BOARD POSITION														//
+//--------------------------------------------------------------------------//
+//This stores the entire board state										//
+//																			//
+//Refer to board positions like this:										//
+//																			//
+//		boardPos[x][y]														//
+//																			//
+//Empty tiles are represented by a 0										//
+//Filled tiles are represented by their color index							//
+//																			//
+//Easily iterate over the entire board with this neat code block			//
+/*																			//
+
+		for( let y = 0; y < BOARD_HEIGHT; y++ ){
+			for( let x = 0; x < BOARD_WIDTH; x++){
+				//Your code here					
+			}
+		}
+
+*/																			//
+//--------------------------------------------------------------------------// 
+
+//TODO: Make boardpos use the position class
 
 //------------------------------//
 // POSITION CLASS 				//
@@ -107,11 +141,18 @@ console.log(boardPos)
 
 class Position{
 	
+	//X position on the board
 	x = 0;
+	
+	//Y position on the board
 	y = 0;
+	
+	//color value, should correspond to one of the color constants above ^^
 	color = 0;
 	
 	constructor(nx, ny, value){
+		
+		//Just pop in the arguments, easy peasy
 		
 		this.x = nx;
 		this.y = ny;
@@ -119,6 +160,7 @@ class Position{
 		
 	}
 	
+	//Self explanatory, just some getters and setters
 	get x(){ return this.x; }
 	get y(){ return this.y; }
 	get color(){ return this.color }
@@ -126,33 +168,39 @@ class Position{
 	set y(val){ this.y = val }
 	set color(val){ this.color = val }
 	
-	occupied(){ //Returns true if this position is empty
-		if( this.y >= BOARD_HEIGHT ){ return true } //Treat the bottom of the board as occupied
-		activePiece.forEach((element) =>{
-			if(element.x == x && element.y == y){ return false }
+	occupied(){ //Returns true if this position is occupied, returns false if movement in clear
+		if( this.y >= BOARD_HEIGHT ){ return true; } //Treat the bottom of the board as occupied
+		activePiece.forEach((element) =>{ //Ignore active pieces, i.e. don't collide with yourself
+			if(element.x == x && element.y == y){ return false; }
 		})
-		return !boardPos[this.x][this.y] == EMPTY
+		return !boardPos[this.x][this.y] == EMPTY //Actual collision check
 	}
 	
 	dropCheck(){ //Same as occupied, but check the space below
-		if( this.y + 1 >= BOARD_HEIGHT ){ return true } //Treat the bottom of the board as occupied
+		if( this.y + 1 >= BOARD_HEIGHT ){ return true; } //Treat the bottom of the board as occupied
 		activePiece.forEach((element) =>{
-			if(element.x == this.x && element.y + 1 == this.y){ return true } //Don't collide with yourself
+			if(element.x == this.x && element.y + 1 == this.y){ return false; } //Don't collide with yourself
 		})
-		return !boardPos[this.x][this.y + 1] == EMPTY
+		return !boardPos[this.x][this.y + 1] == EMPTY //y+1 is the space below
 	}
+	
+	//TODO: Side check doesn't completely work for some reason
 	
 	sideCheck(dir){ //Same as occupied but checks to the right or left
-		if(this.x + dir < 0 || this.x + dir >= BOARD_WIDTH){ return true; } //Treat the sides of the board as occupied
+		if(this.x + dir < 0 || this.x + dir >= BOARD_WIDTH){ console.log("hit wall"); return true; } //Treat the sides of the board as occupied
 		activePiece.forEach((element) =>{
-			if(element.x == this.x && element.y == this.y){ return false; } //Don't collide with yourself
+			if(element.x == this.x + dir && element.y == this.y){ console.log("self collision" + " " + this.x + " " + this.y); return false; } //Don't collide with yourself
 		})
-		return !boardPos[this.x + dir][this.y] == EMPTY
+		
+		console.log("Standard check")
+		return !boardPos[this.x + dir][this.y] == EMPTY // dir will always be +1 or -1, corresponds to RIGHT or LEFT movement
 	}
 	
-	bump(dir){ //Apply movement left or right
+	bump(dir){ //Apply movement left or right (Don't do this until collision checking has passed)
 		this.x += dir;
 	}
+	
+	//Static class functions let you run these functions on the class template instead of a class instance, which is useful in some situations
 	
 	static occupied(x, y){ //Allows collision checking on arbitrary locations without initializing a whole class for it
 		if( this.y >= BOARD_HEIGHT ){ return true }
@@ -182,6 +230,8 @@ function firstLoad(){ //Runs once when the page loads
 	queueA = buildQueue();
 	queueB = buildQueue();
 	
+	
+	
 }
 
 //------------------------------//
@@ -203,7 +253,9 @@ window.addEventListener("keydown", function (event) {
 			break;
 				
 			case "ArrowUp":
-				// code for "up arrow" key press.
+				
+				rotatePiece()
+				
 			break;
 				
 			case "ArrowLeft":
@@ -284,13 +336,20 @@ function update(){
 		if( activePiece == null ){
 			
 			var letter = queueA.shift() //Sets the desired letter to the next in the queue
-			activePiece = []
+			activePiece = [] //Prep activePiece to be filled with position classes
 			
-			if( queueA.length == 0 ){
-				queueA = queueB;
-				queueB = buildQueue()
+			if( queueA.length == 0 ){ //If we've run out of pieces in our list...
+				queueA = queueB; //Shift the secondary list up
+				queueB = buildQueue() //And replace it with a new list
+				
+				//The whole point of the secondary list thing is we can show the 'next-up' pieces to the player.
+				//That's not implimented yet, but I'm trying to think ahead, y'know?
+				
 			}
 			
+			//This is kind of gross, try to ignore it
+			//Spawns a piece by decoding the piece position constant
+			//Check out the position.build() function for more stuff that probably doesn't make sense
 			for( let n = 0; n < 4; n++ ){
 				
 				activePiece.push( Position.build( letter, n ) );
@@ -299,53 +358,57 @@ function update(){
 			
 		}
 		
+		//Here's where we're actually gonna try to drop the piece down one pip
+		//First, clear the active piece, because it makes collision checks easier
 		activePiece.forEach((element) => {
 			boardPos[element.x][element.y] = EMPTY
 		})
 			
-		var colCheck = true //Set false if collision check fails
+		var colCheck = true //Set false if collision check fails at any step
 		
+		//Check each tile of the active piece and make sure they're all clear to move
+		//If they aren't clear, flip the colCkeck flag
 		activePiece.forEach((element) => {
 			if(element.dropCheck()){colCheck = false;}
 		})
 		
-		if(colCheck){ //If nothing is in the way
+		if(colCheck){ //If we found nothing in the way earlier...
 			
+			//Bump it and write it down
 			activePiece.forEach((element) => {
 				element.y += 1
 				boardPos[element.x][element.y] = element.color
 			})
 			
-		}else{
+		}else{ //If we DID collide with something earlier...
 			
+			//Don't move and lock in the active piece's position
 			activePiece.forEach((element) => {
 				boardPos[element.x][element.y] = element.color
 			})
 			
-			activePiece = null
+			activePiece = null //Setting this to NULL will tell the game to spawn a new piece on the next logic step
 			
-			for( let row = 0; row < BOARD_HEIGHT; row++){ //Mark rows for clearing after each piece is placed
+			//And after all that, we check to see if the player completed a row
+			for( let row = 0; row < BOARD_HEIGHT; row++){ //For each row...
 				
-				var cRow = true;
+				var cRow = true; //Check flag
 				
-				for( let col = 0; col < BOARD_WIDTH; col++ ){//iterate over each piece within each row
+				for( let col = 0; col < BOARD_WIDTH; col++ ){//Look at each tile in that row...
 					
-					if( boardPos[col][row] == 0 ){ cRow = false; }
+					if( boardPos[col][row] == EMPTY ){ cRow = false; }//And flip the flag if any tiles in the row are empty
 					
 				}
 				
-				if( cRow ){
+				if( cRow ){ //If we looked over a row without finding an empty tile...
 					
-					rowsToClear.push( row );
-					console.log( "clear row " + row )
+					rowsToClear.push( row ); //Mark down which row is full. It will be dealt with next logic step
 					
 				}
 				
 			}
 			
 		}
-			
-		
 	
 		nextStep = curTime + pace
 		
@@ -353,29 +416,30 @@ function update(){
 	
 }
 
-function draw(){
+function draw(){ //MAJDA: Put your stuff here :)
 	
 	//Called each frame, put graphics functions here
 	
 	var board = document.getElementById('board')
 	
+	//Converts the boardPos data into one easy string, complete with color data
 	board.innerHTML = boardToString();
 	
 	frame++
 	
 }
 
-function buildQueue(){
+function buildQueue(){ //Returns a shuffled list of all the tetris pieces, each appearing once.
 	
 	var pieces = ['I', 'J', 'L', 'O', 'S', 'T', 'Z']; //Starting pieces
-	var q = [];
-	var element;
+	var q = []; //Array we're gonna return at the end
+	var element; //Keeps track of our randomly chosen target
 	
 	while( pieces.length != 0 ){
 		
 		element = Math.floor( Math.random() * pieces.length ); //Pick a random index
 		q.push( pieces[element] ); //Add the item at that index to the queue
-		pieces.splice( element, 1 ); //Delete the element
+		pieces.splice( element, 1 ); //Delete the element from the starting array
 		
 	}
 	
@@ -383,22 +447,24 @@ function buildQueue(){
 	
 }
 
+//Tries to move the active piece left or right based on user input
 function bump( dir ){
 	
-	if(activePiece != null){
-		var clear = true;
+	if(activePiece != null){ //Don't run this if there's no piece ready, otherwise this WILL crash
+		var clear = true; //Switch, gets flipped to false if we collide with something
 		
-		activePiece.forEach((element) => {
-			if( !element.sideCheck(dir) ){
-				clear = false;
+		activePiece.forEach((element) => { //Check each active piece's tile
+			//console.log("!")
+			if( !element.sideCheck(dir) ){ //If we collide with something
+				clear = false; //Flip the switch
 			}
 		})
 		
-		if(!clear){
-			activePiece.forEach((element) => {
+		if(clear){ //If we are cleared for movement
+			activePiece.forEach((element) => { //Clear the current position
 				boardPos[element.x][element.y] = EMPTY
 			})
-			activePiece.forEach((element) => {
+			activePiece.forEach((element) => { //Move it over, and write down the new position
 				element.bump( dir )
 				boardPos[element.x][element.y] = element.color;
 			})
@@ -406,6 +472,13 @@ function bump( dir ){
 	}
 }
 
+function rotatePiece(){
+	
+	//Piece rotation code goes here
+	
+}
+
+//Don't worry about this function, it's gonna get replaced by something less gross and complicated
 function boardToString(){
 	
 	var b = ""
