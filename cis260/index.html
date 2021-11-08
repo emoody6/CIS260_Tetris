@@ -7,20 +7,21 @@
 		<title>Tiny Tetris</title>
 
 		<link rel="stylesheet" href="style.css">
-
-		<script src="main.js"></script>
-
+		
 		<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.0.0/dist/tf.min.js"></script>
+		<script src="main.js"></script>
 
 	</head>
 	
 	<body onload="firstLoad()" style="background-color:#323232">
+		
+		<div style="margin:auto; width:20%">
+			<p id="num" style="color:#ffffff" ></p>
+			<p id="frame" style="color:#ffffff"></p>
 	
-		<p id="num" style="color:#ffffff" ></p>
-		<p id="frame"></p>
-	
-		<p id="board" style="font-size: 24px"></p>
-	
+			<p id="board" style="font-size: 32px; line-height: 16px; letter-spacing: -6px;"></p>
+		</div>
+		
 		<table></table>
 	
 	</body>

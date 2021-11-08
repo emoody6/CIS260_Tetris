@@ -1,14 +1,26 @@
 
 //GLOBAL VARIABLES//
 
-console.log( [1, 4, 32, 16, 12] )
+// Tensorflow Training Setup //
+/*
+const model = tf.sequential()
+model.add( tf.layers.dense({ units: 8, inputShape: [1] }) )
+model.add( tf.layers.dense({ units: 4 }) )
+model.add( tf.layers.dense({ units: 1 }) )
+
+model.predict(tf.randomNormal([10, 1])).print();
+
+model.save('localstorage')
+*/
+// Tetris Game Setup //
 
 var startTime;	//Time when the program starts
 var lastTime;	//Time of previous frame
 var curTime;	//Time of current frame
 
 var frame; //Number of the frame we are on right now
-var pace = 400; //Automatic piece movement time (ms); Speeds up as the game continues
+var startingPace = 500
+var pace = startingPace; //Automatic piece movement time (ms); Speeds up as the game continues
 var nextStep = 0; //Keeps track of when the next step should occue
 
 var queueA = [] //List of pieces to use next
@@ -16,8 +28,13 @@ var queueB = [] //Replaces A once A is empty, then is replaced by a new list
 
 var rowsToClear = []; //Holds a list of the rows that are completed and need to be cleared
 var clearingRow = 0; //Variable that controls row clearing. See the section on row clearing for more detailed analysis
-
 var score = 0
+
+var gameState = 1
+
+const GAME_OVER = 0
+const GAME_PLAY = 1
+const GAME_SETUP = 2
 
 //Positional constants
 const LEFT = -1;
@@ -61,8 +78,9 @@ const COLOR_CODE = {
 	5:	'#30e0e0',
 	6:	'#3030e0',
 	7: 	'#e030e0',
-	
 }
+
+const SPAWN_OFFSET = [3, -1]
 
 //Spawn positions of the pieces
 const PIECES = {
@@ -177,6 +195,9 @@ const OFFSET_GROUPS = [
 	],
 	
 ]
+
+const POINTS = [0, 50, 200, 500, 1000]
+const PACE_MOD = [1.000, 0.970, 0.960, 0.953, 0.950]
 
 var boardPos = []
 
@@ -365,37 +386,19 @@ class Position{
 					
 				}
 				
-				switch( rowsToClear.length ){
-					case 1:
-						score += 50
-						pace -= 2
-					break;
-					
-					case 2:
-						score += 200
-						pace -= 3
-					break;
-					
-					case 3:
-						score += 450
-						pace -= 4
-					break;
-					
-					case 4:
-						score += 1000
-						pace -= 4
-					break;
-					
-					default:
-					
-					break;
-				}
+				console.log( POINTS[ rowsToClear.length ] )
+				score += POINTS[ rowsToClear.length ]
+				pace = Math.ceil( pace * PACE_MOD[ rowsToClear.length ] )
+				
+				
 				
 			}
 			
 		}
 		
 	}
+	
+
 	
 	static apHardDrop(){
 		
@@ -417,8 +420,8 @@ class Position{
 			
 			var newRot = apRot + dir //The new rotation index we're trying to verify
 			var colCheck = false //Mark if we've found a valid rotation index
-			var validIndex = 0 //The valid rotation index we've found
-			var offsetGroup = PIECES[apLetter].OffsetGroup //An array of the potential valid offsets for the active piece
+			var validIndex = -1 //The valid rotation index we've found
+			
 			
 			if( newRot < 0 ){ //Javascript doesn't support modulo on negative numbers, I guess
 				newRot = 3
@@ -426,19 +429,27 @@ class Position{
 				newRot = newRot % 4
 			}
 			
-			activePiece.forEach((element, n) => {
+			var offsetPool = OFFSET_GROUPS[ PIECES[apLetter].OffsetGroup ][newRot]
+			
+			offsetPool.forEach( (oGroup, p) => {
+			
+				activePiece.forEach((element, n) => {
+					
+					colCheck = (colCheck) ? true : Position.occupied( PIECES[apLetter].Rotation[newRot][n][X] + apCenter[X] + offsetPool[p][X], PIECES[apLetter].Rotation[newRot][n][Y] + apCenter[Y] + offsetPool[p][Y])
+					
+				})
 				
-				//var tryPos = PIECES[apLetter].Rotation[newRot]
-				
-				console.log( apCenter )
-				
-				//if( Position.occupied( tryPos[n][X] + apCenter, tryPos[n][Y] + apCenter ) ){
-				//	colCheck = true
-				//}
+				if( !colCheck && validIndex == -1 ){
+					validIndex = p
+				}else{
+					colCheck = false
+				}
 				
 			})
 			
-			if(!colCheck){ //This actually applies the rotation with the valid offset
+			console.log( validIndex )
+			
+			if(validIndex != -1){ //This actually applies the rotation with the valid offset
 				
 				apRot += dir
 				
@@ -447,8 +458,8 @@ class Position{
 				var nY = 0
 				
 				activePiece.forEach((element, n) => {
-					nX = newPos[n][X] + apCenter[X] 	//Update location
-					nY = newPos[n][Y] + apCenter[Y]
+					nX = newPos[n][X] + apCenter[X] + offsetPool[validIndex][X]	//Update location
+					nY = newPos[n][Y] + apCenter[Y] + offsetPool[validIndex][Y]	
 					element.x = nX						//Set location
 					element.y = nY
 					boardPos[nX][nY] = element.color	//Record color
@@ -479,7 +490,7 @@ class Position{
 		
 		var blueprints = PIECES[letter].Rotation[0] //Gets the spawn positions of our desired piece
 		
-		return new Position( blueprints[index][X], blueprints[index][Y], COLOR[letter] )
+		return new Position( blueprints[index][X] + SPAWN_OFFSET[X], blueprints[index][Y] + SPAWN_OFFSET[Y], COLOR[letter] )
 	}
 	
 }
@@ -583,78 +594,93 @@ function update(){
 	
 	//Run this before the main game logic, blocks main logic from running this tick
 	//Handles clearing completed rows
-	if( curTime > nextStep && rowsToClear.length > 0 ){
+	switch( gameState ){
 		
-		//If scan line is at the top, start clearing the next row if there is one
-		if(clearingRow == 0){
-			clearingRow = rowsToClear[0];
-		}
+		case GAME_OVER:
 		
-		//FIRST BLOCK: If scan line was moved down for the first time, clear the line.
-		//SECOND BLOCK: Otherwise, don't clear the row and shift it down instead.
-		if( clearingRow == rowsToClear[0] ){
-			
-			boardPos.forEach((element) => {
-				element[clearingRow] = EMPTY;
-			})
-			
-		}else{
-			boardPos.forEach((element) => {
-				element[clearingRow + 1] = element[clearingRow];
-				element[clearingRow] = EMPTY;
-			})
-		}
+		break;
 		
-		clearingRow -= 1; //Set target for next row
-			
-		//If we got to the top, remove the last completed row from the queue
-		if(clearingRow == 0){
-			rowsToClear.shift();
-			rowsToClear.forEach((element) => {
-				element += 1 //Don't forget that all the rows just got moved down, this corrects for that
-			})
-		}
-		
-		nextStep += pace / 4
-		
-	}else if( curTime > nextStep ){
-		//Main game logic.
-		//NEXTSTEP is when we should think next. This should only run when we're ready to think.
-		
-		//activePiece will be NULL whenever a piece has been placed but a new one has not yet spawned
-		//This block spawns a new piece at the top of the board.
-		if( activePiece == null ){
-			
-			var letter = queueA.shift() //Sets the desired letter to the next in the queue
-			activePiece = [] //Prep activePiece to be filled with position classes
-			apCenter = []
-			
-			if( queueA.length == 0 ){ //If we've run out of pieces in our list...
-				queueA = queueB; //Shift the secondary list up
-				queueB = buildQueue() //And replace it with a new list
+		case GAME_PLAY:
+			if( curTime > nextStep && rowsToClear.length > 0 ){
 				
-				//The whole point of the secondary list thing is we can show the 'next-up' pieces to the player.
-				//That's not implimented yet, but I'm trying to think ahead, y'know?
+				//If scan line is at the top, start clearing the next row if there is one
+				if(clearingRow == 0){
+					clearingRow = rowsToClear[0];
+				}
+				
+				//FIRST BLOCK: If scan line was moved down for the first time, clear the line.
+				//SECOND BLOCK: Otherwise, don't clear the row and shift it down instead.
+				if( clearingRow == rowsToClear[0] ){
+					
+					boardPos.forEach((element) => {
+						element[clearingRow] = EMPTY;
+					})
+					
+				}else{
+					boardPos.forEach((element) => {
+						element[clearingRow + 1] = element[clearingRow];
+						element[clearingRow] = EMPTY;
+					})
+				}
+				
+				clearingRow -= 1; //Set target for next row
+					
+				//If we got to the top, remove the last completed row from the queue
+				if(clearingRow == 0){
+					rowsToClear.shift();
+					rowsToClear.forEach((element) => {
+						element += 1 //Don't forget that all the rows just got moved down, this corrects for that
+					})
+				}
+				
+				nextStep += pace * 0.1
+				
+			}else if( curTime > nextStep ){
+				//Main game logic.
+				//NEXTSTEP is when we should think next. This should only run when we're ready to think.
+				
+				//activePiece will be NULL whenever a piece has been placed but a new one has not yet spawned
+				//This block spawns a new piece at the top of the board.
+				if( activePiece == null ){
+					
+					var letter = queueA.shift() //Sets the desired letter to the next in the queue
+					activePiece = [] //Prep activePiece to be filled with position classes
+					apCenter = []
+					
+					if( queueA.length == 0 ){ //If we've run out of pieces in our list...
+						queueA = queueB; //Shift the secondary list up
+						queueB = buildQueue() //And replace it with a new list
+						
+						//The whole point of the secondary list thing is we can show the 'next-up' pieces to the player.
+						//That's not implimented yet, but I'm trying to think ahead, y'know?
+						
+					}
+					
+					//This is kind of gross, try to ignore it
+					//Spawns a piece by decoding the piece position constant
+					//Check out the position.build() function for more stuff that probably doesn't make sense
+					for( let n = 0; n < 4; n++ ){
+						activePiece.push( Position.build( letter, n ) );
+						if( Position.occupied(activePiece[n].x, activePiece[n].y )){ gameState = GAME_OVER }
+					}
+					apCenter = [3, -1]
+					apLetter = letter
+					apRot = 0
+					
+				}else{
+					
+					Position.apDrop();
+					
+				}
+			
+				nextStep = curTime + pace
 				
 			}
-			
-			//This is kind of gross, try to ignore it
-			//Spawns a piece by decoding the piece position constant
-			//Check out the position.build() function for more stuff that probably doesn't make sense
-			for( let n = 0; n < 4; n++ ){
-				activePiece.push( Position.build( letter, n ) );
-			}
-			apCenter = [1, 1]
-			apLetter = letter
-			apRot = 0
-			
-		}else{
-			
-			Position.apDrop();
-			
-		}
-	
-		nextStep = curTime + pace
+		break;
+		
+		case GAME_SETUP:
+		
+		break;
 		
 	}
 	
@@ -666,12 +692,19 @@ function draw(){ //MAJDA: Put your stuff here :)
 	
 	var board = document.getElementById('board')
 	var num = document.getElementById('num')
+	var pframe = document.getElementById('frame')
 	
 	//Converts the boardPos data into one easy string, complete with color data
 	board.innerHTML = boardToString();
 	
-	num.innerHTML = score
+	var paceMod = startingPace/pace
 	
+	num.innerHTML = score + "pts | " + paceMod.toFixed(2) + "x"
+	if(gameState==GAME_PLAY){
+		pframe.innerHTML = "Next Piece: " + ( queueA.length!=0 ? queueA[0] : queueB[0] )
+	}else{
+		pframe.innerHTML = "GAME OVER"
+	}
 	frame++
 	
 }
