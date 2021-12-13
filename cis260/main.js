@@ -1,17 +1,6 @@
 
 //GLOBAL VARIABLES//
 
-// Tensorflow Training Setup //
-/*
-const model = tf.sequential()
-model.add( tf.layers.dense({ units: 8, inputShape: [1] }) )
-model.add( tf.layers.dense({ units: 4 }) )
-model.add( tf.layers.dense({ units: 1 }) )
-
-model.predict(tf.randomNormal([10, 1])).print();
-
-model.save('localstorage')
-*/
 // Tetris Game Setup //
 
 var startTime;	//Time when the program starts
@@ -31,6 +20,10 @@ var clearingRow = 0; //Variable that controls row clearing. See the section on r
 var score = 0
 
 var gameState = 1
+
+var lastMLoutput
+var MLtrigger = 0
+var AI_active = false
 
 const GAME_OVER = 0
 const GAME_PLAY = 1
@@ -196,6 +189,59 @@ const OFFSET_GROUPS = [
 	
 ]
 
+
+// Tensorflow Training Setup //
+
+function get_model(){
+	
+}
+
+const model = tf.sequential()
+
+model.add( tf.layers.conv2d({
+	
+	inputShape: [BOARD_WIDTH, BOARD_HEIGHT, 1],
+	kernelSize: 5,
+	filters: 8,
+    strides: 1,
+    activation: 'relu',
+    kernelInitializer: 'varianceScaling'
+	
+}) )
+
+/*
+model.add(tf.layers.maxPooling2d({poolSize: [2, 2], strides: [2, 2]}));
+
+model.add(tf.layers.conv2d({
+	
+    kernelSize: 5,
+    filters: 16,
+    strides: 1,
+    activation: 'relu',
+    kernelInitializer: 'varianceScaling'
+	
+ }));
+  
+model.add(tf.layers.maxPooling2d({poolSize: [2, 2], strides: [2, 2]}));
+*/
+model.add( tf.layers.flatten() )
+
+const OUTPUT_CASES = 5
+
+model.add(tf.layers.dense({
+	units: OUTPUT_CASES,
+    kernelInitializer: 'varianceScaling',
+    activation: 'softmax'
+}));
+const optimizer = tf.train.adam();
+  model.compile({
+    optimizer: optimizer,
+    loss: 'categoricalCrossentropy',
+    metrics: ['accuracy'],
+});
+
+//model.save('localstorage')
+
 const POINTS = [0, 50, 200, 500, 1000]
 const PACE_MOD = [1.000, 0.970, 0.960, 0.953, 0.950]
 
@@ -204,6 +250,27 @@ var boardPos = []
 for( let n = 0; n < BOARD_WIDTH; n++){	
 	boardPos.push( Array(BOARD_HEIGHT).fill(0) )
 }
+
+
+async function get_model_prediction(){
+	
+	var data = [[]]
+	
+	for( let y = 0; y < BOARD_WIDTH; y++ ){
+
+		data[0].push([])
+
+		for( let x = 0; x < BOARD_HEIGHT; x++){
+			data[0][y].push( [0] )
+		}
+	}
+	
+	//var out = model.predict(tf.tensor(data)).array()
+	let out = await tf.randomNormal( [5] ).array()
+
+	return out
+}
+
 
 /*--------------------------------------------------------------------------//
 //		BOARD POSITION														//
@@ -229,7 +296,7 @@ for( let n = 0; n < BOARD_WIDTH; n++){
 */																			//
 //--------------------------------------------------------------------------*/ 
 
-//TODO: Make boardpos use the position class
+
 
 //------------------------------//
 // POSITION CLASS 				//
@@ -487,7 +554,6 @@ class Position{
 	}
 	
 	static build(letter, index){ //Returns location classes using the piece data as a blueprints
-		
 		var blueprints = PIECES[letter].Rotation[0] //Gets the spawn positions of our desired piece
 		
 		return new Position( blueprints[index][X] + SPAWN_OFFSET[X], blueprints[index][Y] + SPAWN_OFFSET[Y], COLOR[letter] )
@@ -520,8 +586,6 @@ function firstLoad(){ //Runs once when the page loads
 	frame = 0
 	
 	//Build the starting piece queues
-	queueA = buildQueue();
-	queueB = buildQueue();
 	
 }
 
@@ -532,52 +596,94 @@ function firstLoad(){ //Runs once when the page loads
 // reacts to them.				//
 //------------------------------*/
 
+function AI_make_move(){
+	let use = []
+	let bias = [2.5, 1.1, 0.9, 1, 0.2]
+	for(let n = 0; n < lastMLoutput.length; n++){
+		use.push( Math.abs(lastMLoutput[n] * bias[n]) )
+	}
+	console.log(use)
+	let i = use.indexOf(Math.max(...use));
+	console.log(i)
+	switch(i){
+		case 0:
+			if(activePiece != null){ //This makes the piece fall instantly
+				nextStep = curTime
+			}
+		break;
+		
+		case 1:
+			Position.apBump(LEFT)
+		break;
+		
+		case 2:
+			Position.apBump(RIGHT)
+		break;
+		
+		case 3:
+			Position.apRotate(LEFT)
+		break;
+		
+		case 4:
+			Position.apRotate(RIGHT)
+		break;
+		
+		default:
+		
+		break;
+	}
+}
+
 window.addEventListener("keydown", function (event) {
 	
 	if(event.defaultPrevented){return}
 		
-		switch (event.key) {
-			
-			case "ArrowDown":
+		if( !AI_active ){
+		
+			switch (event.key) {
 				
-				if(activePiece != null){ //This makes the piece fall instantly
-					nextStep = curTime
-				}
+				case "ArrowDown":
+					
+					if(activePiece != null){ //This makes the piece fall instantly
+						nextStep = curTime
+					}
+					
+				break;
+					
+				case "ArrowUp":
+					
+					Position.apHardDrop()
+					
+				break;
+					
+				case "ArrowLeft":
+			  
+					Position.apBump(LEFT)
+			  
+				break;
 				
-			break;
+				case "ArrowRight":
+			  
+					Position.apBump(RIGHT)
+			  
+				break;
 				
-			case "ArrowUp":
+				case "z":
+			  
+					Position.apRotate(LEFT)
+			  
+				break;
 				
-				Position.apHardDrop()
-				
-			break;
-				
-			case "ArrowLeft":
-		  
-				Position.apBump(LEFT)
-		  
-			break;
-			
-			case "ArrowRight":
-		  
-				Position.apBump(RIGHT)
-		  
-			break;
-			
-			case "z":
-		  
-				Position.apRotate(LEFT)
-		  
-			break;
-			
-			case "x":
-		  
-				Position.apRotate(RIGHT)
-		  
-			break;
-				
-			default:
-				return;
+				case "x":
+			  
+					Position.apRotate(RIGHT)
+			  
+				break;
+					
+				default:
+					return;
+			}
+		
 		}
 		
 	event.preventDefault();
@@ -601,6 +707,11 @@ function update(){
 		break;
 		
 		case GAME_PLAY:
+		
+			if( AI_active ){
+				AI_think_step()
+			}
+		
 			if( curTime > nextStep && rowsToClear.length > 0 ){
 				
 				//If scan line is at the top, start clearing the next row if there is one
@@ -642,8 +753,9 @@ function update(){
 				//activePiece will be NULL whenever a piece has been placed but a new one has not yet spawned
 				//This block spawns a new piece at the top of the board.
 				if( activePiece == null ){
-					
+
 					var letter = queueA.shift() //Sets the desired letter to the next in the queue
+
 					activePiece = [] //Prep activePiece to be filled with position classes
 					apCenter = []
 					
@@ -686,7 +798,24 @@ function update(){
 	
 }
 
-function draw(){ //MAJDA: Put your stuff here :)
+function AI_think_step(){
+	
+	if(curTime > MLtrigger){
+		get_model_prediction().then(
+			function(value){ lastMLoutput = value }
+		)
+		
+		if( lastMLoutput != null ){
+			AI_make_move()
+		}
+		
+		MLtrigger = curTime + ( pace / 10 )
+
+		
+	}
+}
+
+function draw(){
 	
 	//Called each frame, put graphics functions here
 	
@@ -756,6 +885,19 @@ function boardToString(){
 	return b
 	
 }
+
+function toggleAI(){
+	if( AI_active ){
+		AI_active = false
+		document.getElementById('aiToggle').innerHTML = "Enable AI"
+	}else{
+		AI_active = true
+		document.getElementById('aiToggle').innerHTML = "Disable AI"
+	}
+}
+
+queueA = buildQueue();
+queueB = buildQueue();
 
 function mainLoop(){
 	
