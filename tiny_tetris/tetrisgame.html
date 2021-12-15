@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Tiny Tetris</title>
+
+		<link rel="stylesheet" href="style.css">
+		<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+		
+		<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.0.0/dist/tf.min.js"></script>
+		<script src="main.js"></script>
+
+	</head>
+	
+	<div class="w3-top">
+	<div class="w3-bar w3-black w3-card">
+    <a class="w3-bar-item w3-button w3-padding-large w3-hide-medium w3-hide-large w3-right" href="javascript:void(0)" onclick="myFunction()" title="Toggle Navigation Menu"><i class="fa fa-bars"></i></a>
+  <a href="index.html" class="w3-bar-item w3-button w3-padding-large">HOME</a>
+    <a href="about.html" class="w3-bar-item w3-button w3-padding-large w3-hide-small">ABOUT</a>
+    <a href="tetrisgame.html" class="w3-bar-item w3-button w3-padding-large w3-hide-small">TETRIS</a>
+    <a href="contact.html" class="w3-bar-item w3-button w3-padding-large w3-hide-small">CONTACT</a>
+</div>
+
+	<body onload="firstLoad()" style="background-color:#323232">
+		
+		<div style="margin:auto; width:20%">
+			<p id="num" style="color:#ffffff" ></p>
+			<p id="frame" style="color:#ffffff"></p>
+	
+			<p id="board" style="font-size: 32px; line-height: 16px; letter-spacing: -6px;"></p>
+		</div>
+		
+		<table></table>
+	<center><button type="button" onclick="toggleAI()" id="aiToggle">Enable AI</button></center>
+	
+	</br>
+	</br>
+	<center><p style="color:white;">ROTATE KEY LEFT: Z   | ROTATE KEY RIGHT: X  |  DROP PIECE: UP KEY   |  <a href="tetrisgame.html">RETRY</a></p>
+	</body>
+	
+</html>

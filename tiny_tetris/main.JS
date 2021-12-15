@@ -1,4 +1,3 @@
-
 //GLOBAL VARIABLES//
 
 // Tetris Game Setup //
@@ -211,7 +210,6 @@ model.add( tf.layers.conv2d({
 
 /*
 model.add(tf.layers.maxPooling2d({poolSize: [2, 2], strides: [2, 2]}));
-
 model.add(tf.layers.conv2d({
 	
     kernelSize: 5,
@@ -286,13 +284,11 @@ async function get_model_prediction(){
 //																			//
 //Easily iterate over the entire board with this neat code block			//
 /*																			//
-
 		for( let y = 0; y < BOARD_HEIGHT; y++ ){
 			for( let x = 0; x < BOARD_WIDTH; x++){
 				//Your code here					
 			}
 		}
-
 */																			//
 //--------------------------------------------------------------------------*/ 
 

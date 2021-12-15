@@ -1,1 +1,11 @@
-This is the Readme file!
+Welcome to Tiny Tetris!
+
+We tried building Tetris from scratch and using the TensorFlow library for Javascript to teach an AI how to play it.
+Give it a try yourself, or let our fledgeling AI try its best to clear some rows.
+
+Contributors:
+-------------------
+Estefania Gonzalez
+Majda Hirich
+Martin Medina
+Evan Moody
